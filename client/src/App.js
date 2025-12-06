@@ -9,11 +9,13 @@ import Register from "./pages/Register";
 import Login from "./pages/Login";
 import Customers from "./pages/Customers";
 import Bills from "./pages/Bills";
+import UserManagement from "./pages/UserManagement";
 function App() {
   return (
     <div className="App">
       <BrowserRouter>
         <Routes>
+          <Route path="/user-management" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
           <Route path="/home" element={<ProtectedRoute><Homepage /></ProtectedRoute>} />
           <Route path="/items" element={<ProtectedRoute><Items /></ProtectedRoute>} />
           <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />

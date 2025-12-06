@@ -1,9 +1,8 @@
-// routes/userRoutes.js
 const express = require("express");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
-const { authenticate } = require("../middleware/auth"); // Ensure authenticate middleware is imported
+const { authenticate } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -31,9 +30,7 @@ router.post("/create-superuser", async (req, res) => {
     res.status(201).json({ message: "Superuser created successfully" });
   } catch (error) {
     console.error("Error creating superuser:", error);
-    res
-      .status(500)
-      .json({ message: "Error creating superuser", error: error.message });
+    res.status(500).json({ message: "Error creating superuser", error: error.message });
   }
 });
 
@@ -66,9 +63,7 @@ router.post("/create-user", authenticate, async (req, res) => {
     res.status(201).json({ message: `User created as ${role}` });
   } catch (error) {
     console.error("Error creating user:", error);
-    res
-      .status(500)
-      .json({ message: "Error creating user", error: error.message });
+    res.status(500).json({ message: "Error creating user", error: error.message });
   }
 });
 
@@ -88,14 +83,10 @@ router.put("/update-profile", authenticate, async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    res
-      .status(200)
-      .json({ message: "Profile updated successfully", updatedUser });
+    res.status(200).json({ message: "Profile updated successfully", updatedUser });
   } catch (error) {
     console.error("Error updating profile:", error);
-    res
-      .status(500)
-      .json({ message: "Error updating profile", error: error.message });
+    res.status(500).json({ message: "Error updating profile", error: error.message });
   }
 });
 
@@ -125,8 +116,16 @@ router.post("/login", async (req, res) => {
 
     res.status(200).json({
       message: "Login successful",
-      token, // Return the token in the response
+      token,
+      user: {
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        userID: user.userID,
+        role: user.role,
+      },
     });
+
   } catch (error) {
     console.error("Error logging in:", error);
     res.status(500).json({ message: "Error logging in", error: error.message });
@@ -155,9 +154,82 @@ router.put("/change-password", authenticate, async (req, res) => {
     res.status(200).json({ message: "Password changed successfully" });
   } catch (error) {
     console.error("Error changing password:", error);
-    res
-      .status(500)
-      .json({ message: "Error changing password", error: error.message });
+    res.status(500).json({ message: "Error changing password", error: error.message });
+  }
+});
+
+// 6. Get all users (superuser & manager) with filtering
+router.get("/users", authenticate, async (req, res) => {
+  try {
+    console.log("User role in request:", req.user.role); // Debugging line
+
+    if (!["superuser", "manager"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Permission denied" });
+    }
+
+    let users;
+    if (req.user.role === "manager") {
+      // Managers cannot see superusers
+      users = await User.find({ role: { $ne: "superuser" } });
+    } else {
+      // Superusers can see all users
+      users = await User.find();
+    }
+
+    res.status(200).json(users);
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ message: "Error fetching users" });
+  }
+});
+
+// 7. Update a user
+router.put("/users/:id", authenticate, async (req, res) => {
+  try {
+    const { firstName, lastName, userID, role, password } = req.body;
+
+    const targetUser = await User.findById(req.params.id);
+    if (!targetUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Manager cannot modify superuser or manager
+    if (req.user.role === "manager" && targetUser.role !== "posuser") {
+      return res.status(403).json({ message: "Permission denied" });
+    }
+
+    // Update fields
+    if (firstName) targetUser.firstName = firstName;
+    if (lastName) targetUser.lastName = lastName;
+    if (userID) targetUser.userID = userID;
+    if (role) targetUser.role = role;
+    if (password) targetUser.password = password;
+
+    await targetUser.save();
+    res.status(200).json(targetUser);
+  } catch (error) {
+    console.error("Error updating user:", error);
+    res.status(500).json({ message: "Error updating user" });
+  }
+});
+
+// 8. Delete user (superuser only)
+router.delete("/users/:id", authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== "superuser") {
+      return res.status(403).json({ message: "Permission denied" });
+    }
+
+    const deletedUser = await User.findByIdAndDelete(req.params.id);
+
+    if (!deletedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ message: "User deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    res.status(500).json({ message: "Error deleting user" });
   }
 });
 
